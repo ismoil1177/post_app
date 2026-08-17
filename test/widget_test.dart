@@ -1,29 +1,44 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:post_app/app.dart';
+import 'package:post_app/blocs/auth/auth_bloc.dart';
+import 'package:post_app/pages/sign_in_page.dart';
+import 'package:post_app/services/strings.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('sign in page shows form fields', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider(
+          create: (_) => AuthBloc(),
+          child: SignInPage(),
+        ),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text(I18N.signin), findsWidgets);
+    expect(find.text(I18N.email), findsOneWidget);
+    expect(find.text(I18N.password), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  testWidgets('invalid sign in shows an error snackbar', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider(
+          create: (_) => AuthBloc(),
+          child: SignInPage(),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField).at(0), 'a');
+    await tester.enterText(find.byType(TextField).at(1), '1');
+    await tester.tap(find.widgetWithText(ElevatedButton, I18N.signin));
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(
+      find.text('Please check your email or password!'),
+      findsOneWidget,
+    );
   });
 }

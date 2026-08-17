@@ -7,8 +7,9 @@ import 'package:post_app/services/strings.dart';
 import 'package:post_app/views/custom_text_field_view.dart';
 
 class SignUpPage extends StatelessWidget {
-  SignUpPage({Key? key}) : super(key: key);
+  SignUpPage({Key? key, this.onSwitchToSignIn}) : super(key: key);
 
+  final VoidCallback? onSwitchToSignIn;
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -22,11 +23,6 @@ class SignUpPage extends StatelessWidget {
           if (state is AuthFailure) {
             ScaffoldMessenger.of(context)
                 .showSnackBar(SnackBar(content: Text(state.message)));
-          }
-
-          if (state is SignUpSuccess) {
-            Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => SignInPage()));
           }
         },
         child: Stack(
@@ -77,6 +73,10 @@ class SignUpPage extends StatelessWidget {
                           style: const TextStyle(color: Colors.lightBlueAccent),
                           recognizer: TapGestureRecognizer()
                             ..onTap = () {
+                              if (onSwitchToSignIn != null) {
+                                onSwitchToSignIn!();
+                                return;
+                              }
                               Navigator.of(context).pushReplacement(
                                   MaterialPageRoute(
                                       builder: (context) => SignInPage()));
@@ -95,7 +95,7 @@ class SignUpPage extends StatelessWidget {
                 if (state is AuthLoading) {
                   return DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.25),
+                      color: Colors.black.withValues(alpha: 0.25),
                     ),
                     child: const Center(
                       child: CircularProgressIndicator(),

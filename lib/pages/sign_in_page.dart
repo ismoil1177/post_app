@@ -2,14 +2,14 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:post_app/blocs/auth/auth_bloc.dart';
-import 'package:post_app/pages/home_page.dart';
 import 'package:post_app/pages/sign_up_page.dart';
 import 'package:post_app/services/strings.dart';
 import 'package:post_app/views/custom_text_field_view.dart';
 
 class SignInPage extends StatelessWidget {
-  SignInPage({Key? key}) : super(key: key);
+  SignInPage({Key? key, this.onSwitchToSignUp}) : super(key: key);
 
+  final VoidCallback? onSwitchToSignUp;
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
@@ -21,11 +21,6 @@ class SignInPage extends StatelessWidget {
           if (state is AuthFailure) {
             ScaffoldMessenger.of(context)
                 .showSnackBar(SnackBar(content: Text(state.message)));
-          }
-
-          if (state is SignInSuccess) {
-            Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => const HomePage()));
           }
         },
         child: Stack(
@@ -69,6 +64,10 @@ class SignInPage extends StatelessWidget {
                           style: const TextStyle(color: Colors.lightBlueAccent),
                           recognizer: TapGestureRecognizer()
                             ..onTap = () {
+                              if (onSwitchToSignUp != null) {
+                                onSwitchToSignUp!();
+                                return;
+                              }
                               Navigator.of(context).pushReplacement(
                                   MaterialPageRoute(
                                       builder: (context) => SignUpPage()));
@@ -87,7 +86,7 @@ class SignInPage extends StatelessWidget {
                 if (state is AuthLoading) {
                   return DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.25),
+                      color: Colors.black.withValues(alpha: 0.25),
                     ),
                     child: const Center(
                       child: CircularProgressIndicator(),

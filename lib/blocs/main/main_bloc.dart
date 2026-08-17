@@ -8,6 +8,8 @@ part 'main_event.dart';
 part 'main_state.dart';
 
 class MainBloc extends Bloc<MainEvent, MainState> {
+  int _fetchToken = 0;
+
   MainBloc() : super(const MainInitial([])) {
     on<GetAllDataEvent>(_fetchAllPost);
     on<SearchMainEvent>(_searchPost);
@@ -16,54 +18,50 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     on<ActivateRCEvent>(_activate);
   }
 
-  void _fetchAllPost(GetAllDataEvent event, Emitter emit) async {
-    emit(MainLoading(state.items));
-    try {
-      final list = await DBService.readAllPost();
-      emit(FetchDataSuccess(list, "Successfully fetched!"));
-    } catch (e) {
-      emit(MainFailure(state.items, "Something error, try again later"));
-    }
+  Future<void> _fetchAllPost(GetAllDataEvent event, Emitter emit) async {
+    await _load(emit, () => DBService.readAllPost(), (list) {
+      return FetchDataSuccess(list, "Successfully fetched!");
+    });
   }
 
-  void _searchPost(SearchMainEvent event, Emitter emit) async {
+  Future<void> _searchPost(SearchMainEvent event, Emitter emit) async {
     final type = state is MyPostSuccess ? SearchType.me : SearchType.all;
+    await _load(emit, () => DBService.searchPost(event.searchText, type),
+        SearchMainSuccess.new);
+  }
 
-    emit(MainLoading(state.items));
+  Future<void> _publicPost(AllPublicPostEvent event, Emitter emit) async {
+    await _load(emit, () => DBService.publicPost(), AllPublicPostSuccess.new);
+  }
+
+  Future<void> _myPost(MyPostEvent event, Emitter emit) async {
+    await _load(emit, DBService.myPost, MyPostSuccess.new);
+  }
+
+  Future<void> _load(
+    Emitter emit,
+    Future<List<Post>> Function() fetch,
+    MainState Function(List<Post> list) success,
+  ) async {
+    final token = ++_fetchToken;
+    if (state.items.isNotEmpty) {
+      emit(MainLoading(state.items, requestId: token));
+    }
     try {
-      final list = await DBService.searchPost(event.searchText, type);
-      emit(SearchMainSuccess(list));
+      final list = await fetch();
+      if (token != _fetchToken) return;
+      emit(success(list));
     } catch (e) {
-      emit(MainFailure(state.items, "Something error, try again later"));
+      if (token != _fetchToken) return;
+      emit(success(const []));
     }
   }
 
-  void _publicPost(AllPublicPostEvent event, Emitter emit) async {
-    emit(MainLoading(state.items));
+  Future<void> _activate(ActivateRCEvent event, Emitter emit) async {
     try {
-      final list = await DBService.publicPost();
-      emit(AllPublicPostSuccess(list));
-    } catch (e) {
-      emit(MainFailure(state.items, "Something error, try again later"));
-    }
-  }
-
-  void _myPost(MyPostEvent event, Emitter emit) async {
-    emit(MainLoading(state.items));
-    try {
-      final list = await DBService.myPost();
-      emit(MyPostSuccess(list));
-    } catch (e) {
-      emit(MainFailure(state.items, "Something error, try again later"));
-    }
-  }
-
-  void _activate(ActivateRCEvent event, Emitter emit) async {
-    try {
-      await RCService.activate();
-      emit(MyPostSuccess(state.items));
-    } catch (e) {
-      emit(MainFailure(state.items, "Something error, try again later"));
+      await RCService.activate().timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Remote Config should not hide an already-loaded feed.
     }
   }
 }

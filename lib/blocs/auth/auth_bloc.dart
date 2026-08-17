@@ -17,7 +17,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<DeleteAccountEvent>(_deleteAccount);
   }
 
-  void _signUp(SignUpEvent event, Emitter emit) async {
+  Future<void> _signUp(SignUpEvent event, Emitter emit) async {
     if (!Util.validateRegistration(
         event.username, event.email, event.password, event.prePassword)) {
       emit(const AuthFailure("Please check your data!"));

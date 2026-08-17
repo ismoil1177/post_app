@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:post_app/models/message_model.dart';
@@ -11,6 +12,35 @@ import 'package:post_app/services/store_service.dart';
 
 sealed class DBService {
   static final db = FirebaseDatabase.instance;
+  static const _queryTimeout = Duration(seconds: 2);
+
+  static List<Post> _parsePosts(Object? value) {
+    if (value == null) return [];
+    final decoded = jsonDecode(jsonEncode(value));
+    if (decoded is! Map) return [];
+    final uid = AuthService.user.uid;
+    final posts = <Post>[];
+    for (final item in decoded.values) {
+      if (item is! Map) continue;
+      try {
+        final map = Map<String, Object?>.from(item);
+        posts.add(Post.fromJson(map, isMe: map["userId"] == uid));
+      } catch (e) {
+        debugPrint("POST PARSE ERROR: $e");
+      }
+    }
+    return posts;
+  }
+
+  static Future<List<Post>> _readPosts() async {
+    try {
+      final snapshot = await db.ref(Folder.post).get().timeout(_queryTimeout);
+      return _parsePosts(snapshot.value);
+    } on FirebaseException catch (e) {
+      debugPrint("ERROR: $e");
+      return [];
+    }
+  }
 
   /// post
   static Future<bool> storePost(
@@ -39,12 +69,12 @@ sealed class DBService {
   }
 
   static Future<List<Post>> readAllPost() async {
-    final folder = db.ref(Folder.post);
-    final data = await folder.get();
-    final json = jsonDecode(jsonEncode(data.value)) as Map;
-    return json.values
-        .map((e) => Post.fromJson(e as Map<String, Object?>))
-        .toList();
+    try {
+      return await _readPosts();
+    } catch (e) {
+      debugPrint("ERROR: $e");
+      return [];
+    }
   }
 
   static Future<bool> deletePost(String postId) async {
@@ -75,23 +105,16 @@ sealed class DBService {
   static Future<List<Post>> searchPost(String text,
       [SearchType type = SearchType.all]) async {
     try {
-      final folder = db.ref(Folder.post);
-      final event = await folder
-          .orderByChild("title")
-          .startAt(text)
-          .endAt("$text\uf8ff")
-          .once();
-      final json = jsonDecode(jsonEncode(event.snapshot.value)) as Map;
-      debugPrint("JSON: $json");
-      final data = json.values
-          .map((e) => Post.fromJson(e as Map<String, Object?>))
-          .toList();
+      final query = text.toLowerCase();
+      final data = await _readPosts();
+      final matched =
+          data.where((post) => post.title.toLowerCase().startsWith(query));
 
       switch (type) {
         case SearchType.all:
-          return data.where((element) => element.isPublic == true).toList();
+          return matched.where((element) => element.isPublic == true).toList();
         case SearchType.me:
-          return data
+          return matched
               .where((element) => element.userId == AuthService.user.uid)
               .toList();
       }
@@ -103,15 +126,8 @@ sealed class DBService {
 
   static Future<List<Post>> publicPost([bool isPublic = true]) async {
     try {
-      final folder = db.ref(Folder.post);
-      final event =
-          await folder.orderByChild("isPublic").equalTo(isPublic).once();
-      final json = jsonDecode(jsonEncode(event.snapshot.value)) as Map;
-      debugPrint("JSON: $json");
-      return json.values
-          .map((e) => Post.fromJson(e as Map<String, Object?>,
-              isMe: e["userId"] == AuthService.user.uid))
-          .toList();
+      final posts = await _readPosts();
+      return posts.where((post) => post.isPublic == isPublic).toList();
     } catch (e) {
       debugPrint("ERROR: $e");
       return [];
@@ -120,16 +136,9 @@ sealed class DBService {
 
   static Future<List<Post>> myPost() async {
     try {
-      final folder = db.ref(Folder.post);
-      final event = await folder
-          .orderByChild("userId")
-          .equalTo(AuthService.user.uid)
-          .once();
-      final json = jsonDecode(jsonEncode(event.snapshot.value)) as Map;
-      debugPrint("JSON: $json");
-      return json.values
-          .map((e) => Post.fromJson(e as Map<String, Object?>, isMe: true))
-          .toList();
+      final uid = AuthService.user.uid;
+      final posts = await _readPosts();
+      return posts.where((post) => post.userId == uid).toList();
     } catch (e) {
       debugPrint("ERROR: $e");
       return [];

@@ -6,7 +6,6 @@ import 'package:post_app/blocs/post/post_bloc.dart';
 import 'package:post_app/models/language_model.dart';
 import 'package:post_app/pages/detail_page.dart';
 import 'package:post_app/pages/post_page.dart';
-import 'package:post_app/pages/sign_in_page.dart';
 import 'package:post_app/services/db_service.dart';
 import 'package:post_app/services/remote_config.dart';
 import 'package:post_app/services/strings.dart';
@@ -23,11 +22,10 @@ class _HomePageState extends State<HomePage> {
   Language? lang;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    context.read<MainBloc>()
-      ..add(const AllPublicPostEvent())
-      ..add(const ActivateRCEvent());
+  void initState() {
+    super.initState();
+    context.read<MainBloc>().add(const AllPublicPostEvent());
+    RCService.activate();
   }
 
   void showWarningDialog(BuildContext ctx) {
@@ -39,10 +37,6 @@ class _HomePageState extends State<HomePage> {
           listener: (context, state) {
             if (state is DeleteAccountSuccess) {
               Navigator.of(context).pop();
-              if (ctx.mounted) {
-                Navigator.of(ctx).pushReplacement(
-                    MaterialPageRoute(builder: (context) => SignInPage()));
-              }
             }
 
             if (state is AuthFailure) {
@@ -202,11 +196,6 @@ class _HomePageState extends State<HomePage> {
                 ScaffoldMessenger.of(context)
                     .showSnackBar(SnackBar(content: Text(state.message)));
               }
-
-              if (state is SignOutSuccess) {
-                Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => SignInPage()));
-              }
             },
           ),
           BlocListener<PostBloc, PostState>(
@@ -230,50 +219,59 @@ class _HomePageState extends State<HomePage> {
           builder: (context, state) {
             return Stack(
               children: [
-                ListView.builder(
-                  padding: const EdgeInsets.all(15),
-                  itemCount: state.items.length,
-                  itemBuilder: (context, index) {
-                    final post = state.items[index];
-                    return GestureDetector(
-                      onLongPress: () {
-                        // Navigator.of(context).push(MaterialPageRoute(builder: (context) => DetailPage(post: post)));
-                        Navigator.of(context).push(MaterialPageRoute(
-                            builder: (context) => PostPage(post: post)));
-                      },
-                      child: Card(
-                        child: Column(
-                          children: [
-                            Container(
-                              color: Colors
-                                  .primaries[index % Colors.primaries.length],
-                              width: MediaQuery.sizeOf(context).width,
-                              height: MediaQuery.sizeOf(context).width - 30,
-                              child: Image(
-                                image: NetworkImage(post.imageUrl),
-                                fit: BoxFit.cover,
+                if (state.items.isEmpty && state is! MainLoading)
+                  Center(
+                    child: Text(
+                      type == SearchType.me
+                          ? "No posts yet"
+                          : "No public posts",
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    padding: const EdgeInsets.all(15),
+                    itemCount: state.items.length,
+                    itemBuilder: (context, index) {
+                      final post = state.items[index];
+                      return GestureDetector(
+                        onLongPress: () {
+                          Navigator.of(context).push(MaterialPageRoute(
+                              builder: (context) => PostPage(post: post)));
+                        },
+                        child: Card(
+                          child: Column(
+                            children: [
+                              Container(
+                                color: Colors.primaries[
+                                    index % Colors.primaries.length],
+                                width: MediaQuery.sizeOf(context).width,
+                                height: MediaQuery.sizeOf(context).width - 30,
+                                child: Image(
+                                  image: NetworkImage(post.imageUrl),
+                                  fit: BoxFit.cover,
+                                ),
                               ),
-                            ),
-                            ListTile(
-                              title: Text(post.title),
-                              subtitle: Text(post.content),
-                              trailing: post.isMe
-                                  ? IconButton(
-                                      onPressed: () {
-                                        context
-                                            .read<PostBloc>()
-                                            .add(DeletePostEvent(post.id));
-                                      },
-                                      icon: const Icon(Icons.delete),
-                                    )
-                                  : null,
-                            ),
-                          ],
+                              ListTile(
+                                title: Text(post.title),
+                                subtitle: Text(post.content),
+                                trailing: post.isMe
+                                    ? IconButton(
+                                        onPressed: () {
+                                          context
+                                              .read<PostBloc>()
+                                              .add(DeletePostEvent(post.id));
+                                        },
+                                        icon: const Icon(Icons.delete),
+                                      )
+                                    : null,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                      );
+                    },
+                  ),
                 if (state is MainLoading)
                   const Center(
                     child: CircularProgressIndicator(),
@@ -291,12 +289,14 @@ class _HomePageState extends State<HomePage> {
         child: const Icon(Icons.create_outlined),
       ),
       bottomNavigationBar: BottomNavigationBar(
+        currentIndex: type == SearchType.me ? 1 : 0,
         onTap: (index) {
+          setState(() {
+            type = index == 0 ? SearchType.all : SearchType.me;
+          });
           if (index == 0) {
-            type = SearchType.all;
             context.read<MainBloc>().add(const AllPublicPostEvent());
           } else {
-            type = SearchType.me;
             context.read<MainBloc>().add(const MyPostEvent());
           }
         },

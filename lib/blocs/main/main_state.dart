@@ -14,10 +14,12 @@ class MainInitial extends MainState {
 }
 
 class MainLoading extends MainState {
-  const MainLoading(super.items);
+  final int requestId;
+
+  const MainLoading(super.items, {this.requestId = 0});
 
   @override
-  List<Object> get props => [items];
+  List<Object> get props => [items, requestId];
 }
 
 class MainFailure extends MainState {

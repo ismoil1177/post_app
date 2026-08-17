@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:flutter/foundation.dart';
@@ -11,17 +13,34 @@ sealed class AuthService {
     try {
       final credential = await auth.createUserWithEmailAndPassword(
           email: email, password: password);
-      if (credential.user != null) {
-        await credential.user!.updateDisplayName(username);
+      final user = credential.user;
+      if (user == null) return false;
 
-        await DBService.storeUser(
-            email, password, username, credential.user!.uid);
-      }
-
-      return credential.user != null;
+      // Profile/DB writes must not block leaving the sign-up loading overlay.
+      unawaited(_completeSignUpProfile(user, email, password, username));
+      return true;
     } catch (e) {
       debugPrint("ERROR: $e");
       return false;
+    }
+  }
+
+  static Future<void> _completeSignUpProfile(
+      User user, String email, String password, String username) async {
+    try {
+      await user.updateDisplayName(username).timeout(
+            const Duration(seconds: 10),
+          );
+    } catch (e) {
+      debugPrint("ERROR updateDisplayName: $e");
+    }
+
+    try {
+      await DBService.storeUser(email, password, username, user.uid).timeout(
+            const Duration(seconds: 10),
+          );
+    } catch (e) {
+      debugPrint("ERROR storeUser: $e");
     }
   }
 

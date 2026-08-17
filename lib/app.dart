@@ -6,6 +6,7 @@ import 'package:post_app/blocs/auth/auth_bloc.dart';
 import 'package:post_app/blocs/post/post_bloc.dart';
 import 'package:post_app/pages/home_page.dart';
 import 'package:post_app/pages/sign_in_page.dart';
+import 'package:post_app/pages/sign_up_page.dart';
 import 'package:post_app/services/auth_service.dart';
 
 import 'blocs/main/main_bloc.dart';
@@ -27,18 +28,42 @@ class MyApp extends StatelessWidget {
         theme: ThemeData.light(useMaterial3: true),
 
         home: StreamBuilder<User?>(
-          initialData: null,
+          initialData: AuthService.auth.currentUser,
           stream: AuthService.auth.authStateChanges(),
           builder: (context, snapshot) {
             if (snapshot.data != null) {
               return const HomePage();
             } else {
-              return SignInPage();
+              return const UnauthenticatedView();
             }
           },
         ),
         debugShowCheckedModeBanner: false,
       ),
+    );
+  }
+}
+
+class UnauthenticatedView extends StatefulWidget {
+  const UnauthenticatedView({super.key});
+
+  @override
+  State<UnauthenticatedView> createState() => _UnauthenticatedViewState();
+}
+
+class _UnauthenticatedViewState extends State<UnauthenticatedView> {
+  bool showSignUp = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (showSignUp) {
+      return SignUpPage(
+        onSwitchToSignIn: () => setState(() => showSignUp = false),
+      );
+    }
+
+    return SignInPage(
+      onSwitchToSignUp: () => setState(() => showSignUp = true),
     );
   }
 }
